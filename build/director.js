@@ -1,8 +1,8 @@
 
 
 //
-// Generated on Tue Dec 16 2014 12:13:47 GMT+0100 (CET) by Charlie Robbins, Paolo Fragomeni & the Contributors (Using Codesurgeon).
-// Version 1.2.6
+// Generated on Thu Jan 01 2015 21:43:49 GMT+0100 (CET) by Charlie Robbins, Paolo Fragomeni & the Contributors (Using Codesurgeon).
+// Version 1.2.7
 //
 
 (function (exports) {
@@ -167,6 +167,8 @@ var Router = exports.Router = function (routes) {
   this.methods  = ['on', 'once', 'after', 'before'];
   this.scope    = [];
   this._methods = {};
+  this.activeRoutes = routes;
+  this.invoked = null;
 
   this._insert = this.insert;
   this.insert = this.insertEx;
@@ -178,8 +180,8 @@ var Router = exports.Router = function (routes) {
 };
 
 Router.prototype.init = function (r) {
-  var self = this
-    , routeTo;
+  var self = this, 
+      routeTo;
   this.handler = function(onChangeEvent) {
     var newURL = onChangeEvent && onChangeEvent.newURL || window.location.hash;
     var url = self.history === true ? self.getPath() : newURL.replace(/.*#/, '');
@@ -194,7 +196,7 @@ Router.prototype.init = function (r) {
     } else if (!dlocHashEmpty()) {
       self.dispatch('on', '/' + dloc.hash.replace(/^(#\/|#|\/)/, ''));
     }
-  }
+  } 
   else {
     if (this.convert_hash_in_init) {
       // Use hash as route
@@ -280,6 +282,25 @@ Router.prototype.getRoute = function (v) {
 
   return ret;
 };
+
+Router.prototype.getInvokedRoute = function()
+{
+  if (!this._invoked)
+    throw new Error('There was no route invoked yet');
+
+  if (this.invoked == this.delimiter) return this.invoked;
+  for (var path in this.activeRoutes)
+  {
+    var handler = this.activeRoutes[path];
+    for (var method in this.invoked)
+    {
+      var fn = this.invoked[method];
+      if (fn === handler) return path;
+    }
+  }
+
+  return false;
+}
 
 Router.prototype.destroy = function () {
   listener.destroy(this.handler);
@@ -444,7 +465,7 @@ Router.prototype.on = Router.prototype.route = function(method, path, route) {
   }
   path = path.split(new RegExp(this.delimiter));
   path = terminator(path, this.delimiter);
-  this.insert(method, this.scope.concat(path), route);
+  this.insert(method, this.scope.concat(path), route, false, path);
 };
 
 Router.prototype.path = function(path, routesFn) {
@@ -561,6 +582,7 @@ Router.prototype.traverse = function(method, path, routes, regexp, filter) {
     next = [ [ routes.before, routes[method] ].filter(Boolean) ];
     next.after = [ routes.after ].filter(Boolean);
     next.matched = true;
+    this.invoked = this.delimiter;
     next.captures = [];
     return filterRoutes(next);
   }
@@ -574,6 +596,7 @@ Router.prototype.traverse = function(method, path, routes, regexp, filter) {
       if (!match) {
         continue;
       }
+      this.invoked = routes[r];
       if (match[0] && match[0] == path && routes[r][method]) {
         next = [ [ routes[r].before, routes[r][method] ].filter(Boolean) ];
         next.after = [ routes[r].after ].filter(Boolean);
